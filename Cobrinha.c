@@ -25,8 +25,8 @@
 #define BORDA_COL 178
 #define OBST_ROW  176
 
-#define CABEC_COB '@'
-#define BODY_COB  254
+#define CABEC_COB 178
+#define BODY_COB  178
 #define MACA_CHAR 'O'
 
 //============= TAD's ============//
@@ -95,6 +95,9 @@ DIRECAO *sorteia_direcao();
 void run_cursor();
 void set_cursor(DWORD x,DWORD y);
 char get_char_by_cursor(DWORD x,DWORD y);
+void hide_cursor();
+
+void delay(int milli_seconds) ;
 
 
 //============== MAIN ============//
@@ -116,7 +119,10 @@ int main(){
     //Atualização de frames
     process = true;
     do{
-        tecla = getch();
+        
+        delay(100);  
+        if(kbhit())
+            tecla = getch();
 
         if(tecla == SETAS){ //Código das setas
             tecla = getch(); //Direção da seta
@@ -145,6 +151,12 @@ int main(){
 
     return 0;
 }
+
+void delay(int milli_seconds) 
+{   
+    clock_t start_time = clock(); 
+    while (clock() < start_time + milli_seconds); 
+} 
 
 //====== ALOCACAO DE TAD's ========//
 TELA *cria_tela(){
@@ -330,14 +342,17 @@ void atualiza_cobra(COBRA *cobra){
 
     ROW *fim = cobra->final;
     ROW *cab = cobra->cabec;
+    int idx_offset;
 
-    //Define corpo onde está a cabeça
-    set_cursor(cab->pos_x, cab->pos_y);
-    putchar(BODY_COB);
+    for(idx_offset = 0; idx_offset < OFFSET_X; idx_offset++){
+        //Define corpo onde está a cabeça
+        set_cursor(cab->pos_x + idx_offset, cab->pos_y);
+        putchar(BODY_COB);
 
-    //Limpa ultima posicao
-    set_cursor(fim->pos_x, fim->pos_y);
-    putchar(EMPTY_ROW);
+        //Limpa ultima posicao
+        set_cursor(fim->pos_x + idx_offset, fim->pos_y);
+        putchar(EMPTY_ROW);
+    }
 
     while(fim != NULL){
         
@@ -353,8 +368,11 @@ void atualiza_cobra(COBRA *cobra){
     cab->pos_x += cobra->direcao->inc_x;
     cab->pos_y += cobra->direcao->inc_y;
 
-    set_cursor(cab->pos_x, cab->pos_y);
-    putchar(cab->elm);
+    for(idx_offset = 0; idx_offset < OFFSET_X; idx_offset++){
+        set_cursor(cab->pos_x + idx_offset, cab->pos_y);
+        putchar(cab->elm);
+    }
+
 }
 
 void atualiza_direcao(int tecla, DIRECAO *direcao){
@@ -507,6 +525,8 @@ ROW **sorteia_obstaculo(){
 
 //=========== CONSOLE ==========//
 void run_cursor(){
+    hide_cursor();
+
     CONSOLE_SCREEN_BUFFER_INFO csbi;
     COORD pos = {0,0};
     DWORD esc;
@@ -529,4 +549,13 @@ char get_char_by_cursor(DWORD x,DWORD y){
 	HANDLE hStd = GetStdHandle(STD_OUTPUT_HANDLE);
 	ReadConsoleOutputCharacter(hStd,(LPTSTR)buf,1,coord,(LPDWORD)&num_read);
 	return buf[0];
+}
+
+void hide_cursor()
+{
+   HANDLE consoleHandle = GetStdHandle(STD_OUTPUT_HANDLE);
+   CONSOLE_CURSOR_INFO info;
+   info.dwSize = 100;
+   info.bVisible = FALSE;
+   SetConsoleCursorInfo(consoleHandle, &info);
 }
