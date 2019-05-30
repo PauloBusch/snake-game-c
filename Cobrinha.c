@@ -1,17 +1,18 @@
+#define _WIN32_WINNT 0x0500 
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <conio.h>
 #include <time.h>
 #include <stdbool.h>
 #include <windows.h>
+#include<dos.h>
 
 //========== CONSTANTES =========//
-#define OBS_RAIZES 50
-#define OBS_ROWS 10
+#define OBS_RAIZES 30
+#define OBS_ROWS 30
 #define OBS_BLOK 5
 
-#define DIMENSAO_X 100
-#define DIMENSAO_Y 50
 #define OFFSET_X 2
 
 #define SETAS     0xE0
@@ -21,13 +22,13 @@
 #define KEY_RIGTH 0x4D
 
 #define EMPTY_ROW ' '
-#define BORDA_ROW 178
-#define BORDA_COL 178
+#define VALID_ROW '+'
+#define BORDA_ROW 177
 #define OBST_ROW  176
 
 #define CABEC_COB 178
 #define BODY_COB  178
-#define MACA_CHAR 'O'
+#define MACA_CHAR '@'
 
 //============= TAD's ============//
 typedef struct ROW{
@@ -47,9 +48,6 @@ typedef struct DIRECAO{
 typedef struct COBRA{
     DIRECAO *direcao;
     ROW *final;
-
-    /*Para evitar processamento na 
-    identificação da primeira posição*/
     ROW *cabec;
 } COBRA;
 
@@ -57,122 +55,136 @@ typedef struct MACA{
     ROW *row;
 } MACA;
 
-typedef struct TELA{
-    COBRA *cobra;
-    MACA *maca;
-    char **matriz;
-} TELA;
+typedef struct No{
+    void *val;
+
+    struct No *prox;
+} No;
+
+typedef struct FILA{
+    No *ini;
+    No *fim;
+} FILA;
+
+//=========== VARIÁVEIS ==========//
+int DIMENSAO_X, DIMENSAO_Y;
 
 //========== ASSINATURAS =========//
-TELA    *cria_tela();
 COBRA   *cria_cobra();
 MACA    *cria_maca();
+ROW     *cria_row();
+FILA    *cria_fila();
 char    **cria_matriz();
 DIRECAO *cria_direcao();
 
 void imprime_cobra(COBRA *cobra);
 void imprime_maca(MACA *maca);
-void imprime_borda();
-void imprime_obstaculo();
+void imprime_borda(char **matriz);
+void imprime_obstaculo(char **matriz);
 void imprime_mensagem(char *mensagem);
 
 void atualiza_direcao(int tecla, DIRECAO *direcao);
 void atualiza_cobra(COBRA *cobra);
 void atualiza_posicao(ROW *row, DIRECAO *direcao);
-void atualiza_maca();
+void atualiza_maca(COBRA *cobra, char **matriz);
+void atualiza_area_trabalho(char **matriz, COBRA *cobra);
 
 char verifica_obstaculo(ROW *row, DIRECAO *direcao);
 bool verifica_colisao(char elm);
 bool verifica_maca(char elm);
+bool verifica_cobra(char elm);
+bool verifica_fila_vazia(FILA *fila);
+
+char **copiar_matriz(char **b_matriz);
+ROW *copiar_row(ROW *b_row);
+
+void libera_matriz(char **b_matriz);
+void libera_fila(FILA *fila);
+void libera_direcao(DIRECAO *direcao);
 
 void alimenta_cobra(COBRA *cobra);
+void alimenta_fila(FILA *fila, void *val);
 
 ROW     *sorteia_row(DIRECAO *direcao);
-ROW     **sorteia_obstaculo();
+ROW     **sorteia_obstaculos();
 MACA    *sorteia_maca();
 DIRECAO *sorteia_direcao();
 
+void set_char_by_cursor(char c,int x,int y);
+char get_char_by_cursor(int x,int y);
+void get_size_window(int *col, int *row);
 void run_cursor();
-void set_cursor(DWORD x,DWORD y);
-char get_char_by_cursor(DWORD x,DWORD y);
 void hide_cursor();
-
-void delay(int milli_seconds) ;
-
+void maximize_window();
 
 //============== MAIN ============//
 int main(){
     
-    TELA *tela = cria_tela();
-    int tecla;
-    bool process;
-
     //Iniciando tela
+    system("cls");
+    maximize_window();
+    get_size_window(&DIMENSAO_X, &DIMENSAO_Y);
     run_cursor();
 
+    //Iniciando variáveis
+    char **quadro = cria_matriz();
+    COBRA *cobra  = cria_cobra();
+    MACA *maca    = cria_maca();
+    bool gaming = true;
+
+    srand(time(NULL));
+
     //Desenhando componentes
-    imprime_borda();
-    imprime_obstaculo();
-    imprime_maca(tela->maca);
-    imprime_cobra(tela->cobra);
+    imprime_borda(quadro);
+    //TODO: sortear no meio
+    imprime_maca(maca);
+    imprime_cobra(cobra);
+    //TODO: colocar pra cima
+    imprime_obstaculo(quadro);
+    atualiza_area_trabalho(quadro, cobra);
 
-    //Atualização de frames
-    process = true;
-    do{
-        
-        delay(100);  
-        if(kbhit())
-            tecla = getch();
-
-        if(tecla == SETAS){ //Código das setas
+    //Atualização de frames    
+    int tecla = getch();
+    do{           
+        if(tecla == SETAS){  //Código das setas
             tecla = getch(); //Direção da seta
-            atualiza_direcao(tecla, tela->cobra->direcao);
-        }                
+
+            atualiza_direcao(tecla, cobra->direcao);
+        }
     
         char elm_coli = verifica_obstaculo(
-            tela->cobra->cabec, 
-            tela->cobra->direcao);
+            cobra->cabec, 
+            cobra->direcao);
 
         if(verifica_colisao(elm_coli)){
             imprime_mensagem("VOCE COLIDIU!");
-            process = false;
+            gaming = false;
             break;
         }
 
         if(verifica_maca(elm_coli)){
-            alimenta_cobra(tela->cobra);
-            atualiza_maca();
+            alimenta_cobra(cobra);
+            atualiza_maca(cobra, quadro);
         }
 
-        atualiza_cobra(tela->cobra);
-    }while(tecla != '*' && process);
+        atualiza_cobra(cobra);
+        Sleep(100);        
 
-    getch();
+        if(kbhit())
+            tecla = getch();
+    }while(tecla != '*' && gaming);
+
+    //libera_matriz(quadro);
+
+    scanf("%c");
 
     return 0;
 }
 
-void delay(int milli_seconds) 
-{   
-    clock_t start_time = clock(); 
-    while (clock() < start_time + milli_seconds); 
-} 
-
 //====== ALOCACAO DE TAD's ========//
-TELA *cria_tela(){
-    
-    TELA *tela = (TELA*)malloc(sizeof(TELA));
-
-    tela->cobra = cria_cobra();
-    tela->maca  = cria_maca();
-    tela->matriz = cria_matriz();
-
-    return tela;
-}
-
 COBRA *cria_cobra(){
     
-    int pos_x = (int)(DIMENSAO_X * OFFSET_X / 3);
+    int pos_x = (int)(DIMENSAO_X / 3);
 
     COBRA *cobra = (COBRA*) malloc(sizeof(COBRA));
     cobra->cabec = (ROW*) malloc(sizeof(ROW));
@@ -190,7 +202,7 @@ COBRA *cria_cobra(){
 
 MACA *cria_maca(){
     
-    int pos_x = (int)(DIMENSAO_X * OFFSET_X / 2);
+    int pos_x = (int)(DIMENSAO_X / 2);
 
     MACA *maca = (MACA*) malloc(sizeof(MACA));
     maca->row = (ROW*) malloc(sizeof(ROW));
@@ -204,17 +216,17 @@ MACA *cria_maca(){
 
 char **cria_matriz(){
 
-    char **matriz = (char**) malloc(sizeof(char*) * DIMENSAO_Y);
+    char **m = (char**) malloc(sizeof(char*) * DIMENSAO_X + OFFSET_X);
 
     int idx_x, idx_y;
-    for(idx_y = 0; idx_y < DIMENSAO_Y; idx_y++){
-        matriz[idx_y] = (char*)malloc(sizeof(char) * DIMENSAO_X);
-        for(idx_x = 0; idx_x < DIMENSAO_X; idx_x++){
-            matriz[idx_y][idx_x] = ' ';
+    for(idx_x = 0; idx_x < DIMENSAO_X + OFFSET_X; idx_x++){
+        m[idx_x] = (char*)malloc(sizeof(char) * DIMENSAO_Y);
+        for(idx_y = 0; idx_y < DIMENSAO_Y; idx_y++){
+            m[idx_x][idx_y] = EMPTY_ROW;
         }
     }
 
-    return matriz;
+    return m;
 }
 
 DIRECAO *cria_direcao(){
@@ -227,69 +239,85 @@ DIRECAO *cria_direcao(){
     return direcao;
 }
 
+ROW *cria_row(){
+    ROW *r = (ROW*) malloc(sizeof(ROW));
+    
+    r->prox = NULL;
+
+    return r;
+}
+
+FILA *cria_fila(){
+    FILA *fila = (FILA*) malloc(sizeof(FILA));
+    
+    fila->ini = NULL;
+    fila->fim = NULL;
+
+    return fila;
+}
+
 //============= DESENHOS ============//
 void imprime_cobra(COBRA *cobra){
 
-    ROW *row = cobra->final;
+    ROW *r = cobra->final;
     
-    while(row != NULL){
-        set_cursor(row->pos_x,row->pos_y);
-        putchar(row->elm);
-
-        row = row->prox;
+    while(r != NULL){
+        set_char_by_cursor(r->elm,r->pos_x,r->pos_y);
+        
+        r = r->prox;
     }
 }
 
 void imprime_maca(MACA *maca){
 
-    set_cursor(
-        maca->row->pos_x,
-        maca->row->pos_y
-    );
+    ROW * r = maca->row;
 
-    putchar(maca->row->elm);
+    set_char_by_cursor(r->elm,r->pos_x,r->pos_y);
 }
 
-void imprime_borda(){
+void imprime_borda(char **matriz){
 
     //Borda X
-    int idx_x, idx_y, lim_x = DIMENSAO_X * OFFSET_X;
-    for(idx_x = 0; idx_x < lim_x; idx_x++){
-        set_cursor(idx_x,0);
-        putchar(BORDA_COL);
+    int idx_x, idx_y, off_x, dmi_x = DIMENSAO_X - DIMENSAO_X % OFFSET_X;
+    for(idx_x = 0; idx_x < dmi_x; idx_x++){
+        matriz[idx_x][0            ] = BORDA_ROW;
+        matriz[idx_x][DIMENSAO_Y -1] = BORDA_ROW;
 
-        set_cursor(idx_x, DIMENSAO_Y -1);
-        putchar(BORDA_COL);
+        set_char_by_cursor(BORDA_ROW,idx_x,0);
+        set_char_by_cursor(BORDA_ROW,idx_x, DIMENSAO_Y -1);
     }
 
     //Borda Y   
     for(idx_y = 0; idx_y < DIMENSAO_Y; idx_y++){
-        set_cursor(0,idx_y);
-        putchar(BORDA_ROW);
-        
-        set_cursor(lim_x, idx_y);
-        putchar(BORDA_ROW);
+        for(off_x = 0; off_x < OFFSET_X; off_x++){
+            matriz[off_x          ][idx_y] = BORDA_ROW;
+            matriz[dmi_x -off_x -1][idx_y] = BORDA_ROW;
+
+            set_char_by_cursor(BORDA_ROW,off_x,idx_y);
+            set_char_by_cursor(BORDA_ROW,dmi_x - off_x -1, idx_y);
+        }
     }
 
 }
 
-void imprime_obstaculo(){
+void imprime_obstaculo(char **matriz){
 
-    ROW **obstaculos = sorteia_obstaculo();
+    ROW **obstaculos = sorteia_obstaculos();
 
     int idx_obs, idx_offset;
     for(idx_obs = 0; idx_obs < OBS_RAIZES; idx_obs++){
-        ROW *obstaculo = obstaculos[idx_obs];
+        ROW *obs = obstaculos[idx_obs];
 
-        while(obstaculo != NULL){
+        while(obs != NULL){
     
             //Iprime nos offsets
             for(idx_offset = 0; idx_offset < OFFSET_X; idx_offset++){
-                set_cursor(obstaculo->pos_x + idx_offset, obstaculo->pos_y);
-                putchar(obstaculo->elm);
+                matriz[obs->pos_x + idx_offset][obs->pos_y] = obs->elm;
+
+                set_char_by_cursor(obs->elm,obs->pos_x + idx_offset, obs->pos_y);
             }
 
-            obstaculo = obstaculo->prox;
+            obs = obs->prox;
         }
     }
 }
@@ -302,38 +330,28 @@ void imprime_mensagem(char *mensagem){
     while(mensagem[size] != '\0')
         size++;
 
-    int div_y = DIMENSAO_Y / 2, s_x = (DIMENSAO_X * OFFSET_X / 2) - (size / 2);
+    int div_y = DIMENSAO_Y / 2, s_x = (DIMENSAO_X / 2) - (size / 2);
 
     //Borda X
     for(idx_x = -2; idx_x < size +2; idx_x++){
 
-            //Iprime nos offsets
-            for(idx_offset = 0; idx_offset < OFFSET_X; idx_offset++){
-                int pos_x = s_x + idx_x + idx_offset;
+        //Iprime nos offsets
+        for(idx_offset = 0; idx_offset < OFFSET_X; idx_offset++){
+            int pos_x = s_x + idx_x + idx_offset;
 
-                //Borda externa
-                set_cursor(pos_x, div_y -2);
-                putchar(178);
+            //Borda externa
+            set_char_by_cursor(178,pos_x, div_y -2);
+            set_char_by_cursor(178,pos_x, div_y +2);
 
-                set_cursor(pos_x, div_y +2);
-                putchar(178);
-
-                //Borda interna
-                set_cursor(pos_x, div_y -1);
-                putchar(EMPTY_ROW);
-
-                set_cursor(pos_x, div_y);
-                putchar(EMPTY_ROW);
-
-                set_cursor(pos_x, div_y +1);
-                putchar(EMPTY_ROW);
-            }
+            //Borda interna
+            set_char_by_cursor(EMPTY_ROW,pos_x, div_y -1);
+            set_char_by_cursor(EMPTY_ROW,pos_x, div_y);
+            set_char_by_cursor(EMPTY_ROW,pos_x, div_y +1);
+        }
     }
 
-
-
     //Mensagem    
-    set_cursor(s_x, div_y);
+    set_char_by_cursor(EMPTY_ROW,s_x, div_y);
     puts(mensagem);
 }
 
@@ -346,12 +364,10 @@ void atualiza_cobra(COBRA *cobra){
 
     for(idx_offset = 0; idx_offset < OFFSET_X; idx_offset++){
         //Define corpo onde está a cabeça
-        set_cursor(cab->pos_x + idx_offset, cab->pos_y);
-        putchar(BODY_COB);
+        set_char_by_cursor(BODY_COB,cab->pos_x + idx_offset, cab->pos_y);
 
         //Limpa ultima posicao
-        set_cursor(fim->pos_x + idx_offset, fim->pos_y);
-        putchar(EMPTY_ROW);
+        set_char_by_cursor(EMPTY_ROW,fim->pos_x + idx_offset, fim->pos_y);
     }
 
     while(fim != NULL){
@@ -369,8 +385,7 @@ void atualiza_cobra(COBRA *cobra){
     cab->pos_y += cobra->direcao->inc_y;
 
     for(idx_offset = 0; idx_offset < OFFSET_X; idx_offset++){
-        set_cursor(cab->pos_x + idx_offset, cab->pos_y);
-        putchar(cab->elm);
+        set_char_by_cursor(cab->elm,cab->pos_x + idx_offset, cab->pos_y);
     }
 
 }
@@ -410,11 +425,113 @@ void atualiza_posicao(ROW *row, DIRECAO *direcao){
     row->pos_y += direcao->inc_y;
 }
 
-void atualiza_maca(){    
-    imprime_maca(sorteia_maca());
+void atualiza_maca(COBRA *cobra, char **matriz){    
+
+    //Regras de aceitação
+    MACA *maca;
+    int p_x, p_y, barreiras;
+
+    DIRECAO *left  = cria_direcao();
+    DIRECAO *right = cria_direcao();
+    DIRECAO *top   = cria_direcao();
+    DIRECAO *down  = cria_direcao();
+
+    do{
+        maca = sorteia_maca();        
+        p_x = maca->row->pos_x;
+        p_y = maca->row->pos_y;
+        barreiras = 0;
+        
+        //Não pode estar em um beco
+        if(verifica_obstaculo(maca->row, left) != VALID_ROW)
+            barreiras++;
+        
+        if(verifica_obstaculo(maca->row, right) != VALID_ROW)
+            barreiras++;        
+        
+        if(verifica_obstaculo(maca->row, top) != VALID_ROW)
+            barreiras++;
+        
+        if(verifica_obstaculo(maca->row, down) != VALID_ROW)
+            barreiras++;
+
+    }while(matriz[p_x][p_y] != VALID_ROW || barreiras >= 3);
+
+    libera_direcao(left );
+    libera_direcao(right);
+    libera_direcao(top  );
+    libera_direcao(down );
+
+    imprime_maca(maca);
 }
 
-//============ STATUS ===========//
+void atualiza_area_trabalho(char **matriz, COBRA *cobra){    
+    FILA *level_in;
+    FILA *level_ex;
+
+    DIRECAO *left  = cria_direcao();
+    DIRECAO *right = cria_direcao();
+    DIRECAO *top   = cria_direcao();
+    DIRECAO *down  = cria_direcao();
+
+    atualiza_direcao(KEY_LEFT,   left);
+    atualiza_direcao(KEY_RIGTH, right);
+    atualiza_direcao(KEY_UP,      top);
+    atualiza_direcao(KEY_DOWN,   down);
+
+    level_in = cria_fila();
+    alimenta_fila(level_in, copiar_row(cobra->cabec));//Raiz
+    
+    No *no;
+    ROW *row;
+    do{
+        level_ex = cria_fila();
+
+        no = level_in->ini;
+        while(no != NULL){
+            row = (ROW*) no->val;
+
+            row->prox = (ROW*) malloc(sizeof(ROW) * 4);
+            
+            int idx_i;
+            char elm;
+            ROW *dir;
+            for(idx_i = 0; idx_i < 4; idx_i++){
+                dir = &row->prox[idx_i];
+
+                dir->pos_x = row->pos_x;
+                dir->pos_y = row->pos_y;
+
+                if(idx_i == 0)atualiza_posicao(dir, down  );
+                if(idx_i == 1)atualiza_posicao(dir, top   );
+                if(idx_i == 2)atualiza_posicao(dir, left  );
+                if(idx_i == 3)atualiza_posicao(dir, right );
+                
+                elm = matriz[dir->pos_x][dir->pos_y];
+
+                if(elm == EMPTY_ROW){
+                    matriz[dir->pos_x][dir->pos_y] = VALID_ROW;
+                    alimenta_fila(level_ex, dir);
+                }
+            }
+
+            //free(rows);
+            no = no->prox;
+        }        
+        //libera_fila(level_in->prox);
+        level_in = level_ex;
+    }while(!verifica_fila_vazia(level_ex));
+
+    // libera_fila(level_in);
+    // libera_fila(level_ex);
+
+    libera_direcao(left );
+    libera_direcao(right);
+    libera_direcao(top  );
+    libera_direcao(down );
+}
+
+//========= ELEMENTOS =========//
 void alimenta_cobra(COBRA *cobra){
     
     ROW *fim = cobra->final;
@@ -426,6 +543,21 @@ void alimenta_cobra(COBRA *cobra){
     novo->prox = fim;
 
     cobra->final = novo;
+}
+
+void alimenta_fila(FILA *fila, void *val){
+    No *no = (No*) malloc(sizeof(No));
+
+    no->val = val;
+    no->prox = NULL;
+    
+    if(verifica_fila_vazia(fila)){
+        fila->ini = no;
+        fila->fim = no;
+    }else{
+        fila->fim->prox = no;
+        fila->fim = no;
+    }
 }
 
 //======== VALIDAÇÕES =========//
@@ -445,12 +577,66 @@ bool verifica_maca(char elm){
     return (elm == MACA_CHAR);
 }
 
+bool verifica_cobra(char elm){
+    return (elm == (char)CABEC_COB || elm == (char)BODY_COB);
+}
+
+bool verifica_fila_vazia(FILA *fila){
+    return (fila->ini == NULL && fila->fim == NULL);
+}
+
+//============== CÓPIAS =============//
+char **copiar_matriz(char **b_matriz){
+    char **n_matriz = (char **) malloc(sizeof(char*) * DIMENSAO_X);
+
+    int idx_x, idx_y;
+    for(idx_x = 0; idx_x < DIMENSAO_X; idx_x++){
+        n_matriz[idx_x] = (char *) malloc(sizeof(char) * DIMENSAO_Y);
+        for(idx_y = 0; idx_y < DIMENSAO_Y; idx_y++){
+            n_matriz[idx_x][idx_y] = b_matriz[idx_x][idx_y];
+        }
+    }
+    return n_matriz;
+}
+
+ROW *copiar_row(ROW *b_row){
+    ROW *r = cria_row();
+
+    r->pos_x = b_row->pos_x;
+    r->pos_y = b_row->pos_y;
+
+    return r;
+}
+
+//========== LIBERANDO =========//
+void libera_matriz(char **b_matriz){
+    int idx_x;
+    for(idx_x = 0; idx_x < DIMENSAO_X; idx_x++){
+        free(b_matriz[idx_x]);
+    }
+    free(b_matriz);
+}
+
+void libera_fila(FILA *fila){
+    No *no = fila->ini;
+    No *an;
+
+    while(no != NULL){
+        an = no;
+        no = no->prox;
+        free(an);
+    }
+}
+
+void libera_direcao(DIRECAO *direcao){
+    free(direcao);
+}
+
 //========== SORTEIOS ==========//
 MACA *sorteia_maca(){
 
     MACA *maca = cria_maca();
     DIRECAO *direcao = cria_direcao();
-    srand(time(NULL));
     maca->row = sorteia_row(direcao);
     maca->row->elm = MACA_CHAR;
 
@@ -472,19 +658,19 @@ ROW *sorteia_row(DIRECAO *direcao){
     row->prox = NULL;
 
     do{
-        row->pos_x = (rand() % (DIMENSAO_X -1) +1) * OFFSET_X;
-        row->pos_y = (rand() % (DIMENSAO_Y -1) +1);
+        row->pos_x = rand() % DIMENSAO_X;
+        row->pos_y = rand() % DIMENSAO_Y;
+        row->pos_x = row->pos_x - row->pos_x % OFFSET_X;
     }while(verifica_obstaculo(row, direcao) != EMPTY_ROW);
 
     return row;
 }
 
-ROW **sorteia_obstaculo(){
+ROW **sorteia_obstaculos(){
     
     ROW **obstaculos = (ROW**) malloc(sizeof(ROW*) * OBS_RAIZES);
     int idx_raiz = 0, idx_row = 0;
     DIRECAO *direcao = sorteia_direcao();
-    srand(time(NULL));
 
     while(idx_raiz < OBS_RAIZES){
         obstaculos[idx_raiz] = sorteia_row(cria_direcao());
@@ -528,21 +714,23 @@ void run_cursor(){
     hide_cursor();
 
     CONSOLE_SCREEN_BUFFER_INFO csbi;
-    COORD pos = {0,0};
+    COORD pos = {DIMENSAO_X,DIMENSAO_Y};
     DWORD esc;
     DWORD tam = csbi.dwSize.X *csbi.dwSize.Y;
     FillConsoleOutputCharacter(GetStdHandle(STD_OUTPUT_HANDLE),EMPTY_ROW,tam,pos,&esc);
     SetConsoleCursorPosition(GetStdHandle(STD_OUTPUT_HANDLE),pos);
 }
 
-void set_cursor(DWORD x,DWORD y){
+void set_char_by_cursor(char c,int x,int y){
     COORD coord;
     coord.X = x;
     coord.Y = y;
     SetConsoleCursorPosition(GetStdHandle(STD_OUTPUT_HANDLE),coord);
+    
+    putchar(c);
 }
 
-char get_char_by_cursor(DWORD x,DWORD y){
+char get_char_by_cursor(int x,int y){
     char buf[2]; 
     COORD coord = {x,y}; 
     DWORD num_read;
@@ -558,4 +746,18 @@ void hide_cursor()
    info.dwSize = 100;
    info.bVisible = FALSE;
    SetConsoleCursorInfo(consoleHandle, &info);
+}
+
+void maximize_window()
+{
+    HWND consoleWindow = GetConsoleWindow();
+    ShowWindow(consoleWindow, SW_MAXIMIZE);
+}
+
+void get_size_window(int *col, int *row){
+    CONSOLE_SCREEN_BUFFER_INFO cmd;
+
+    GetConsoleScreenBufferInfo(GetStdHandle(STD_OUTPUT_HANDLE), &cmd);
+    *col = cmd.srWindow.Right - cmd.srWindow.Left +1;
+    *row = cmd.srWindow.Bottom - cmd.srWindow.Top +1;
 }
