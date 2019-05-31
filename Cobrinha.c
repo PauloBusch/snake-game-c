@@ -12,14 +12,7 @@
 #define OBS_RAIZES 30
 #define OBS_ROWS 30
 #define OBS_BLOK 5
-
 #define OFFSET_X 2
-
-#define SETAS     0xE0
-#define KEY_UP    0x48
-#define KEY_DOWN  0x50
-#define KEY_LEFT  0x4B
-#define KEY_RIGTH 0x4D
 
 #define EMPTY_ROW ' '
 #define VALID_ROW '+'
@@ -29,6 +22,17 @@
 #define CABEC_COB 178
 #define BODY_COB  178
 #define MACA_CHAR '@'
+
+#define SETAS     0xE0
+#define KEY_UP    0x48
+#define KEY_DOWN  0x50
+#define KEY_LEFT  0x4B
+#define KEY_RIGTH 0x4D
+
+#define D_TOP atualiza_direcao(KEY_UP,cria_direcao())
+#define D_DOW atualiza_direcao(KEY_DOWN,cria_direcao())
+#define D_LEF atualiza_direcao(KEY_LEFT,cria_direcao())
+#define D_RHT atualiza_direcao(KEY_RIGTH,cria_direcao())
 
 //============= TAD's ============//
 typedef struct ROW{
@@ -83,7 +87,7 @@ void imprime_borda(char **matriz);
 void imprime_obstaculo(char **matriz);
 void imprime_mensagem(char *mensagem);
 
-void atualiza_direcao(int tecla, DIRECAO *direcao);
+DIRECAO *atualiza_direcao(int tecla, DIRECAO *direcao);
 void atualiza_cobra(COBRA *cobra);
 void atualiza_posicao(ROW *row, DIRECAO *direcao);
 void atualiza_maca(COBRA *cobra, char **matriz);
@@ -390,34 +394,35 @@ void atualiza_cobra(COBRA *cobra){
 
 }
 
-void atualiza_direcao(int tecla, DIRECAO *direcao){
+DIRECAO *atualiza_direcao(int tecla, DIRECAO *direcao){
 
     switch(tecla){ 
         case KEY_UP:
             if(direcao->inc_y > 0)
-                return;
+                break;
             direcao->inc_x = 0;
             direcao->inc_y =-1;
             break;
         case KEY_DOWN:
             if(direcao->inc_y < 0)
-                return;
+                break;
             direcao->inc_x = 0;
             direcao->inc_y = 1;
             break;
         case KEY_LEFT:
             if(direcao->inc_x > 0)
-                return;
+                break;
             direcao->inc_x =-OFFSET_X;
             direcao->inc_y = 0;
             break;
         case KEY_RIGTH:
             if(direcao->inc_x > 0)
-                return;
+                break;
             direcao->inc_x = OFFSET_X;
             direcao->inc_y = 0;
             break;
     }
+    return direcao;
 }
 
 void atualiza_posicao(ROW *row, DIRECAO *direcao){
@@ -431,16 +436,6 @@ void atualiza_maca(COBRA *cobra, char **matriz){
     MACA *maca;
     int p_x, p_y, barreiras;
 
-    DIRECAO *left  = cria_direcao();
-    DIRECAO *right = cria_direcao();
-    DIRECAO *top   = cria_direcao();
-    DIRECAO *down  = cria_direcao();
-
-    atualiza_direcao(KEY_LEFT,   left);
-    atualiza_direcao(KEY_RIGTH, right);
-    atualiza_direcao(KEY_UP,      top);
-    atualiza_direcao(KEY_DOWN,   down);
-
     do{
         maca = sorteia_maca();        
         p_x = maca->row->pos_x;
@@ -448,21 +443,16 @@ void atualiza_maca(COBRA *cobra, char **matriz){
         
         barreiras = 0;
         //Não pode estar em um beco
-        if(matriz[p_x + left->inc_x][p_y + left->inc_y] != VALID_ROW)
+        if(matriz[p_x + D_LEF->inc_x][p_y + D_LEF->inc_y] != VALID_ROW)
             barreiras++;
-        if(matriz[p_x + right->inc_x][p_y + right->inc_y] != VALID_ROW)
+        if(matriz[p_x + D_RHT->inc_x][p_y + D_RHT->inc_y] != VALID_ROW)
             barreiras++;
-        if(matriz[p_x + top->inc_x][p_y + top->inc_y] != VALID_ROW)
+        if(matriz[p_x + D_TOP->inc_x][p_y + D_TOP->inc_y] != VALID_ROW)
             barreiras++;
-        if(matriz[p_x + down->inc_x][p_y + down->inc_y] != VALID_ROW)
+        if(matriz[p_x + D_DOW->inc_x][p_y + D_DOW->inc_y] != VALID_ROW)
             barreiras++;
 
     }while(matriz[p_x][p_y] != VALID_ROW || barreiras >= 3);
-
-    libera_direcao(left );
-    libera_direcao(right);
-    libera_direcao(top  );
-    libera_direcao(down );
 
     imprime_maca(maca);
 }
@@ -470,16 +460,6 @@ void atualiza_maca(COBRA *cobra, char **matriz){
 void atualiza_area_trabalho(char **matriz, COBRA *cobra){    
     FILA *level_in;
     FILA *level_ex;
-
-    DIRECAO *left  = cria_direcao();
-    DIRECAO *right = cria_direcao();
-    DIRECAO *top   = cria_direcao();
-    DIRECAO *down  = cria_direcao();
-
-    atualiza_direcao(KEY_LEFT,   left);
-    atualiza_direcao(KEY_RIGTH, right);
-    atualiza_direcao(KEY_UP,      top);
-    atualiza_direcao(KEY_DOWN,   down);
 
     level_in = cria_fila();
     alimenta_fila(level_in, copiar_row(cobra->cabec));//Raiz
@@ -504,10 +484,10 @@ void atualiza_area_trabalho(char **matriz, COBRA *cobra){
                 dir->pos_x = row->pos_x;
                 dir->pos_y = row->pos_y;
 
-                if(idx_i == 0)atualiza_posicao(dir, down  );
-                if(idx_i == 1)atualiza_posicao(dir, top   );
-                if(idx_i == 2)atualiza_posicao(dir, left  );
-                if(idx_i == 3)atualiza_posicao(dir, right );
+                if(idx_i == 0)atualiza_posicao(dir, D_DOW );
+                if(idx_i == 1)atualiza_posicao(dir, D_TOP );
+                if(idx_i == 2)atualiza_posicao(dir, D_LEF );
+                if(idx_i == 3)atualiza_posicao(dir, D_RHT );
                 
                 elm = matriz[dir->pos_x][dir->pos_y];
 
@@ -527,11 +507,6 @@ void atualiza_area_trabalho(char **matriz, COBRA *cobra){
 
     // libera_fila(level_in);
     // libera_fila(level_ex);
-
-    libera_direcao(left );
-    libera_direcao(right);
-    libera_direcao(top  );
-    libera_direcao(down );
 }
 
 //========= ELEMENTOS =========//
