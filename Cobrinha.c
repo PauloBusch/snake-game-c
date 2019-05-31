@@ -436,23 +436,25 @@ void atualiza_maca(COBRA *cobra, char **matriz){
     DIRECAO *top   = cria_direcao();
     DIRECAO *down  = cria_direcao();
 
+    atualiza_direcao(KEY_LEFT,   left);
+    atualiza_direcao(KEY_RIGTH, right);
+    atualiza_direcao(KEY_UP,      top);
+    atualiza_direcao(KEY_DOWN,   down);
+
     do{
         maca = sorteia_maca();        
         p_x = maca->row->pos_x;
         p_y = maca->row->pos_y;
+        
         barreiras = 0;
-        
         //Não pode estar em um beco
-        if(verifica_obstaculo(maca->row, left) != VALID_ROW)
+        if(matriz[p_x + left->inc_x][p_y + left->inc_y] != VALID_ROW)
             barreiras++;
-        
-        if(verifica_obstaculo(maca->row, right) != VALID_ROW)
-            barreiras++;        
-        
-        if(verifica_obstaculo(maca->row, top) != VALID_ROW)
+        if(matriz[p_x + right->inc_x][p_y + right->inc_y] != VALID_ROW)
             barreiras++;
-        
-        if(verifica_obstaculo(maca->row, down) != VALID_ROW)
+        if(matriz[p_x + top->inc_x][p_y + top->inc_y] != VALID_ROW)
+            barreiras++;
+        if(matriz[p_x + down->inc_x][p_y + down->inc_y] != VALID_ROW)
             barreiras++;
 
     }while(matriz[p_x][p_y] != VALID_ROW || barreiras >= 3);
@@ -510,6 +512,7 @@ void atualiza_area_trabalho(char **matriz, COBRA *cobra){
                 elm = matriz[dir->pos_x][dir->pos_y];
 
                 if(elm == EMPTY_ROW){
+                    //set_char_by_cursor(VALID_ROW,dir->pos_x,dir->pos_y);
                     matriz[dir->pos_x][dir->pos_y] = VALID_ROW;
                     alimenta_fila(level_ex, dir);
                 }
