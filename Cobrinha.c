@@ -94,6 +94,7 @@ void atualiza_maca(COBRA *cobra, char **matriz);
 void atualiza_area_trabalho(char **matriz, COBRA *cobra);
 
 char verifica_obstaculo(ROW *row, DIRECAO *direcao);
+int  verifica_barreiras(ROW *row, char **matriz);
 bool verifica_colisao(char elm);
 bool verifica_maca(char elm);
 bool verifica_cobra(char elm);
@@ -438,25 +439,13 @@ void atualiza_maca(COBRA *cobra, char **matriz){
 
     //Regras de aceitação
     MACA *maca;
-    int p_x, p_y, barreiras;
+    int p_x, p_y;
+    char elm;
 
     do{
-        maca = sorteia_maca();        
-        p_x = maca->row->pos_x;
-        p_y = maca->row->pos_y;
-        
-        barreiras = 0;
-        //Não pode estar em um beco
-        if(matriz[p_x + D_LEF->inc_x][p_y + D_LEF->inc_y] != VALID_ROW)
-            barreiras++;
-        if(matriz[p_x + D_RHT->inc_x][p_y + D_RHT->inc_y] != VALID_ROW)
-            barreiras++;
-        if(matriz[p_x + D_TOP->inc_x][p_y + D_TOP->inc_y] != VALID_ROW)
-            barreiras++;
-        if(matriz[p_x + D_DOW->inc_x][p_y + D_DOW->inc_y] != VALID_ROW)
-            barreiras++;
-
-    }while(matriz[p_x][p_y] != VALID_ROW || barreiras >= 3);
+        maca = sorteia_maca();
+        elm = matriz[maca->row->pos_x][maca->row->pos_y];
+    }while(elm != VALID_ROW || verifica_barreiras(maca->row,matriz) >= 3);
 
     imprime_maca(maca);
 }
@@ -549,6 +538,20 @@ char verifica_obstaculo(ROW *row, DIRECAO *direcao){
     int new_pos_y = row->pos_y + direcao->inc_y;
 
     return get_char_by_cursor(new_pos_x, new_pos_y);
+}
+
+int  verifica_barreiras(ROW *row, char **matriz){
+    int barreiras = 0;
+    if(matriz[row->pos_x + D_LEF->inc_x][row->pos_y + D_LEF->inc_y] != VALID_ROW)
+        barreiras++;
+    if(matriz[row->pos_x + D_RHT->inc_x][row->pos_y + D_RHT->inc_y] != VALID_ROW)
+        barreiras++;
+    if(matriz[row->pos_x + D_TOP->inc_x][row->pos_y + D_TOP->inc_y] != VALID_ROW)
+        barreiras++;
+    if(matriz[row->pos_x + D_DOW->inc_x][row->pos_y + D_DOW->inc_y] != VALID_ROW)
+        barreiras++;  
+
+    return barreiras;   
 }
 
 bool verifica_colisao(char elm){
