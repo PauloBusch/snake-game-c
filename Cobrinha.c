@@ -104,6 +104,8 @@ char **copiar_matriz(char **b_matriz);
 ROW *copiar_row(ROW *b_row);
 
 void libera_matriz(char **b_matriz);
+void libera_cobra(COBRA *cobra);
+void libera_maca(MACA *maca);
 void libera_fila(FILA *fila);
 void libera_direcao(DIRECAO *direcao);
 
@@ -123,70 +125,86 @@ DIRECAO *sorteia_direcao();
 void set_char_by_cursor(char c,int x,int y);
 char get_char_by_cursor(int x,int y);
 void get_size_window(int *col, int *row);
+void hide_cursor(bool hide);
 void run_cursor();
-void hide_cursor();
 void maximize_window();
 
 //============== MAIN ============//
 int main(){
     
     //Iniciando tela
-    system("cls");
     maximize_window();
     get_size_window(&DIMENSAO_X, &DIMENSAO_Y);
     run_cursor();
 
-    //Iniciando variáveis
-    char **quadro = cria_matriz();
-    COBRA *cobra  = cria_cobra();
-    MACA *maca    = cria_maca();
-    bool gaming = true;
+    //Iniciando jogo
+    bool jogando = true;
+    do{
+        //Iniciando variáveis
+        srand(time(NULL));
+        char **quadro = cria_matriz();
+        COBRA *cobra  = cria_cobra();
+        MACA *maca    = cria_maca();
+        bool vivo = true;
 
-    srand(time(NULL));
+        //Desenhando componentes
+        system("cls");
+        imprime_borda(quadro);
+        //TODO: sortear no meio
+        imprime_maca(maca);
+        imprime_cobra(cobra);
+        //TODO: colocar pra cima
+        imprime_obstaculo(quadro);
+        atualiza_area_trabalho(quadro, cobra);
 
-    //Desenhando componentes
-    imprime_borda(quadro);
-    //TODO: sortear no meio
-    imprime_maca(maca);
-    imprime_cobra(cobra);
-    //TODO: colocar pra cima
-    imprime_obstaculo(quadro);
-    atualiza_area_trabalho(quadro, cobra);
+        //Atualização de frames    
+        int tecla = getch();
+        do{           
+            if(tecla == SETAS){  //Código das setas
+                tecla = getch(); //Direção da seta
 
-    //Atualização de frames    
-    int tecla = getch();
-    do{           
-        if(tecla == SETAS){  //Código das setas
-            tecla = getch(); //Direção da seta
+                atualiza_direcao(tecla, cobra->direcao);
+            }
+        
+            char elm_coli = verifica_obstaculo(
+                cobra->cabec, 
+                cobra->direcao);
 
-            atualiza_direcao(tecla, cobra->direcao);
-        }
-    
-        char elm_coli = verifica_obstaculo(
-            cobra->cabec, 
-            cobra->direcao);
+            if(verifica_colisao(elm_coli)){
+                hide_cursor(false);
+                imprime_mensagem("VOCE COLIDIU!, deseja reiniciar? [s/n] ");
+                scanf("%c",&tecla);
+                while(tecla != 's' && tecla != 'n'){
+                    imprime_mensagem("TECLA INCORRETA!, deseja reiniciar? [s/n] ");
+                    scanf("%c",&tecla);
+                }
+                hide_cursor(true);
+                jogando = tecla == 's';
+                vivo = false;
+                break;
+            }
 
-        if(verifica_colisao(elm_coli)){
-            imprime_mensagem("VOCE COLIDIU!");
-            gaming = false;
-            break;
-        }
+            if(verifica_maca(elm_coli)){
+                alimenta_cobra(cobra);
+                atualiza_maca(cobra, quadro);
+            }
 
-        if(verifica_maca(elm_coli)){
-            alimenta_cobra(cobra);
-            atualiza_maca(cobra, quadro);
-        }
+            atualiza_cobra(cobra);
+            Sleep(100);        
 
-        atualiza_cobra(cobra);
-        Sleep(100);        
+            if(kbhit())
+                tecla = getch();
+        }while(vivo);
 
-        if(kbhit())
-            tecla = getch();
-    }while(tecla != '*' && gaming);
+        //libera_matriz(quadro);
+        libera_cobra(cobra);
+        libera_maca(maca);
+    }while(jogando);
 
-    //libera_matriz(quadro);
-
-    scanf("%c");
+        
+    hide_cursor(false);
+    imprime_mensagem("FIM DE JOGO!, tecle qualquer tecla para fechar...");
+    getch();
 
     return 0;
 }
@@ -230,7 +248,7 @@ char **cria_matriz(){
 
     int idx_x, idx_y;
     for(idx_x = 0; idx_x < DIMENSAO_X + OFFSET_X; idx_x++){
-        m[idx_x] = (char*)malloc(sizeof(char) * DIMENSAO_Y);
+        m[idx_x] = (char*) malloc(sizeof(char) * DIMENSAO_Y);
         for(idx_y = 0; idx_y < DIMENSAO_Y; idx_y++){
             m[idx_x][idx_y] = EMPTY_ROW;
         }
@@ -334,7 +352,7 @@ void imprime_obstaculo(char **matriz){
 
 void imprime_mensagem(char *mensagem){
     
-    int idx_x, idx_y, idx_offset, size = 0;
+    int idx_x, idx_y, idx_offset, size = 1;
 
     //Calcula tamanho da string
     while(mensagem[size] != '\0')
@@ -363,6 +381,7 @@ void imprime_mensagem(char *mensagem){
     //Mensagem    
     set_char_by_cursor(EMPTY_ROW,s_x, div_y);
     puts(mensagem);
+    set_char_by_cursor(EMPTY_ROW,s_x + size, div_y);
 }
 
 //=========== ATUALIZAÇÕES ==========//
@@ -596,10 +615,25 @@ ROW *copiar_row(ROW *b_row){
 //========== LIBERANDO =========//
 void libera_matriz(char **b_matriz){
     int idx_x;
-    for(idx_x = 0; idx_x < DIMENSAO_X; idx_x++){
+    for(idx_x = 0; idx_x < DIMENSAO_X + OFFSET_X; idx_x++){
         free(b_matriz[idx_x]);
     }
     free(b_matriz);
+}
+
+void libera_cobra(COBRA *cobra){
+    ROW *no = cobra->final;
+    ROW *an;
+
+    while(no != NULL){
+        an = no;
+        no = no->prox;
+        free(an);
+    }
+}
+
+void libera_maca(MACA *maca){
+    free(maca);
 }
 
 void libera_fila(FILA *fila){
@@ -718,7 +752,7 @@ ROW **sorteia_obstaculos(){
 
 //=========== CONSOLE ==========//
 void run_cursor(){
-    hide_cursor();
+    hide_cursor(true);
 
     CONSOLE_SCREEN_BUFFER_INFO csbi;
     COORD pos = {DIMENSAO_X,DIMENSAO_Y};
@@ -746,12 +780,12 @@ char get_char_by_cursor(int x,int y){
 	return buf[0];
 }
 
-void hide_cursor()
+void hide_cursor(bool hide)
 {
    HANDLE consoleHandle = GetStdHandle(STD_OUTPUT_HANDLE);
    CONSOLE_CURSOR_INFO info;
    info.dwSize = 100;
-   info.bVisible = FALSE;
+   info.bVisible = !hide;
    SetConsoleCursorInfo(consoleHandle, &info);
 }
 
