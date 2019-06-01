@@ -29,10 +29,10 @@
 #define KEY_LEFT  0x4B
 #define KEY_RIGTH 0x4D
 
-#define D_TOP atualiza_direcao(KEY_UP,cria_direcao())
-#define D_DOW atualiza_direcao(KEY_DOWN,cria_direcao())
-#define D_LEF atualiza_direcao(KEY_LEFT,cria_direcao())
-#define D_RHT atualiza_direcao(KEY_RIGTH,cria_direcao())
+#define D_TOP direcao_cima()
+#define D_DOW direcao_baixo()
+#define D_LEF direcao_esquerda()
+#define D_RHT direcao_direita()
 
 //============= TAD's ============//
 typedef struct ROW{
@@ -87,7 +87,7 @@ void imprime_borda(char **matriz);
 void imprime_obstaculo(char **matriz);
 void imprime_mensagem(char *mensagem);
 
-DIRECAO *atualiza_direcao(int tecla, DIRECAO *direcao);
+void atualiza_direcao(int tecla, DIRECAO *direcao);
 void atualiza_cobra(COBRA *cobra);
 void atualiza_posicao(ROW *row, DIRECAO *direcao);
 void atualiza_maca(COBRA *cobra, char **matriz);
@@ -108,6 +108,11 @@ void libera_direcao(DIRECAO *direcao);
 
 void alimenta_cobra(COBRA *cobra);
 void alimenta_fila(FILA *fila, void *val);
+
+DIRECAO *direcao_cima();
+DIRECAO *direcao_baixo();
+DIRECAO *direcao_esquerda();
+DIRECAO *direcao_direita();
 
 ROW     *sorteia_row(DIRECAO *direcao);
 ROW     **sorteia_obstaculos();
@@ -394,35 +399,34 @@ void atualiza_cobra(COBRA *cobra){
 
 }
 
-DIRECAO *atualiza_direcao(int tecla, DIRECAO *direcao){
+void atualiza_direcao(int tecla, DIRECAO *direcao){
 
     switch(tecla){ 
         case KEY_UP:
             if(direcao->inc_y > 0)
-                break;
+                return;
             direcao->inc_x = 0;
             direcao->inc_y =-1;
             break;
         case KEY_DOWN:
             if(direcao->inc_y < 0)
-                break;
+                return;
             direcao->inc_x = 0;
             direcao->inc_y = 1;
             break;
         case KEY_LEFT:
             if(direcao->inc_x > 0)
-                break;
+                return;
             direcao->inc_x =-OFFSET_X;
             direcao->inc_y = 0;
             break;
         case KEY_RIGTH:
             if(direcao->inc_x > 0)
-                break;
+                return;
             direcao->inc_x = OFFSET_X;
             direcao->inc_y = 0;
             break;
     }
-    return direcao;
 }
 
 void atualiza_posicao(ROW *row, DIRECAO *direcao){
@@ -608,6 +612,28 @@ void libera_fila(FILA *fila){
 
 void libera_direcao(DIRECAO *direcao){
     free(direcao);
+}
+
+//========= DIREÇÕES =========//
+DIRECAO *direcao_cima(){
+    DIRECAO *dir = cria_direcao();
+    atualiza_direcao(KEY_UP, dir);
+    return dir;
+}
+DIRECAO *direcao_baixo(){
+    DIRECAO *dir = cria_direcao();
+    atualiza_direcao(KEY_DOWN, dir);
+    return dir;
+}
+DIRECAO *direcao_esquerda(){
+    DIRECAO *dir = cria_direcao();
+    atualiza_direcao(KEY_LEFT, dir);
+    return dir;
+}
+DIRECAO *direcao_direita(){
+    DIRECAO *dir = cria_direcao();
+    atualiza_direcao(KEY_RIGTH, dir);
+    return dir;
 }
 
 //========== SORTEIOS ==========//
